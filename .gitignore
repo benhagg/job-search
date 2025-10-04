@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+.Python
+.env
+env/
+venv/
+.venv/
+build/
+dist/
+*.egg-info/
+
+# VS Code
+.vscode/
+
+# Docker
+*.log
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python packaging
+pip-wheel-metadata/
+
+# data
+data/
+db-data/

@@ -1,0 +1,45 @@
+services:
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    # depends_on:
+    #   - rag
+  rag:
+    build:
+      context: ./services/rag
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    depends_on:
+      - llm
+      - db
+    environment:
+      - DB_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}
+  llm:
+    build:
+      context: ./services/llm
+      dockerfile: Dockerfile
+    ports:
+      - "5111:5111"
+    env_file:
+      - .env
+
+  db:
+    image: postgres:15
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    volumes:
+      - "./db-data:/var/lib/postgresql/data"
+    # ensure pgvector extension installed in init script
+  ingest:
+    build:
+      context: ./services/ingest
+      dockerfile: Dockerfile
+    depends_on:
+      - db
+    volumes:
+      - "./data:/data"

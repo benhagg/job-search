@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Job Search — RAG UI</title>
+    <style>
+      body {
+        font-family: system-ui, Segoe UI, Roboto, Arial;
+        max-width: 900px;
+        margin: 36px auto;
+        padding: 0 16px;
+        color: #111;
+      }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+      input[type="text"] {
+        flex: 1;
+        padding: 10px 12px;
+        font-size: 16px;
+      }
+      button {
+        padding: 10px 14px;
+        font-size: 16px;
+      }
+      .result {
+        border: 1px solid #e1e1e1;
+        padding: 12px;
+        margin: 10px 0;
+        border-radius: 6px;
+      }
+      .meta {
+        font-size: 13px;
+        color: #666;
+        margin-bottom: 6px;
+      }
+      pre {
+        white-space: pre-wrap;
+        background: #fafafa;
+        padding: 8px;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1 style="margin: 0; font-size: 20px">Job Search (RAG)</h1>
+      <div style="flex: 1"></div>
+    </header>
+
+    <section>
+      <div style="display: flex; gap: 8px">
+        <input
+          id="q"
+          type="text"
+          placeholder="Search for job listings, e.g. 'remote backend engineer'"
+        />
+        <button id="searchBtn">Search</button>
+      </div>
+      <div style="margin-top: 8px">
+        <label
+          ><input id="useAi" type="checkbox" checked /> Use AI answer
+          (RAG)</label
+        >
+      </div>
+    </section>
+
+    <section id="status" style="margin-top: 12px; color: #444"></section>
+    <section id="results" style="margin-top: 12px"></section>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
