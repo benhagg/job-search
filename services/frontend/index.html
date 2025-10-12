@@ -60,17 +60,78 @@
           placeholder="Search for job listings, e.g. 'remote backend engineer'"
         />
         <button id="searchBtn">Search</button>
+        <button id="healthBtn" onClick="checkHealth()">Check RAG Health</button>
       </div>
       <div style="margin-top: 8px">
         <label
           ><input id="useAi" type="checkbox" checked /> Use AI answer
           (RAG)</label
         >
+        <label style="margin-top: 8px; margin-left: 16px"
+          ><input
+            id="nResults"
+            type="number"
+            value="5"
+            min="1"
+            max="1000"
+            style="width: 60px"
+          />
+          Number of Results</label
+        >
+      </div>
       </div>
     </section>
 
     <section id="status" style="margin-top: 12px; color: #444"></section>
+    <section id="health" style="margin-top: 12px; color: #444"></section>
     <section id="results" style="margin-top: 12px"></section>
+
+    <!-- Upload Job Listings Section -->
+    <section
+      id="upload-section"
+      style="margin-top: 32px; border-top: 1px solid #eee; padding-top: 24px"
+    >
+      <h2 style="font-size: 18px; margin-bottom: 12px">Upload Job Listings</h2>
+      <div style="margin-bottom: 12px">
+        <label
+          ><input type="radio" name="uploadType" value="json" checked />
+          JSON</label
+        >
+        <label style="margin-left: 16px"
+          ><input type="radio" name="uploadType" value="form" /> Form</label
+        >
+        <label style="margin-left: 16px"
+          ><input type="radio" name="uploadType" value="csv" /> CSV</label
+        >
+      </div>
+      <div id="upload-json" style="display: block">
+        <textarea
+          id="jsonInput"
+          rows="8"
+          style="width: 100%; font-family: monospace"
+          placeholder="Paste an array of job objects here"
+        ></textarea>
+        <button id="validateJsonBtn">Validate JSON</button>
+        <button id="submitJsonBtn">Submit Valid JSON</button>
+        <div
+          id="jsonValidationStatus"
+          style="margin-top: 8px; color: #444"
+        ></div>
+      </div>
+      <div id="upload-form" style="display: none">
+        <form id="jobForm">
+          <div id="formFields"></div>
+          <button type="button" id="addFormEntryBtn">Add Another Entry</button>
+          <button type="submit">Submit All</button>
+        </form>
+        <div id="formStatus" style="margin-top: 8px; color: #444"></div>
+      </div>
+      <div id="upload-csv" style="display: none">
+        <input type="file" id="csvFileInput" accept=".csv" />
+        <button id="submitCsvBtn">Upload CSV</button>
+        <div id="csvStatus" style="margin-top: 8px; color: #444"></div>
+      </div>
+    </section>
 
     <script src="./app.js"></script>
   </body>

@@ -5,19 +5,25 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    # depends_on:
-    #   - rag
+    volumes:
+      - ./services/frontend:/app
+    depends_on:
+      - rag
   rag:
     build:
       context: ./services/rag
       dockerfile: Dockerfile
     ports:
       - "8000:8000"
+      # debugpy port
+      - "5678:5678"
+    volumes:
+      - ./services/rag:/app
     depends_on:
       - llm
-      - db
+      - chroma
     environment:
-      - DB_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:${POSTGRES_PORT}/${POSTGRES_DB}
+      - EMBEDDING_URL=http://embed:8003/embed
   llm:
     build:
       context: ./services/llm
@@ -27,19 +33,50 @@ services:
     env_file:
       - .env
 
-  db:
-    image: postgres:15
+  chroma:
+    image: chromadb/chroma
+    ports:
+      - "8001:8001"
     environment:
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      - CHROMA_DB_IMPL=duckdb+parquet
+      - CHROMA_SERVER_HTTP_PORT=8001
+      - CHROMA_SERVER_ALLOW_ORIGIN=*
+      - CHROMA_PERSISTENCE_DIR=/data/chromadb
     volumes:
-      - "./db-data:/var/lib/postgresql/data"
-    # ensure pgvector extension installed in init script
+      - ./data/chromadb:/data/chromadb
+    command:
+      ["run", "--host", "0.0.0.0", "--port", "8001", "--path", "/data/chromadb"]
   ingest:
     build:
       context: ./services/ingest
       dockerfile: Dockerfile
     depends_on:
-      - db
+      - chroma
+    ports:
+      - "8002:8002"
+      # debugpy port
+      - "5679:5679"
     volumes:
-      - "./data:/data"
+      - ./services/ingest:/app
+    environment:
+      - EMBEDDING_URL=http://embed:8003/embed
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+  embed:
+    build:
+      context: ./services/embed
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+      # debugpy port
+      - "5680:5680"
+    volumes:
+      - ./services/embed:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3

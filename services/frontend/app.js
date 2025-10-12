@@ -1,8 +1,12 @@
 const API_BASE = "http://localhost:8000"; // RAG container
+const INGEST_BASE = "http://localhost:8002"; // Ingest container
 const searchBtn = document.getElementById("searchBtn");
+const healthBtn = document.getElementById("healthBtn");
 const qInput = document.getElementById("q");
+const nResultsInput = document.getElementById("nResults");
 const resultsEl = document.getElementById("results");
 const statusEl = document.getElementById("status");
+const healthEl = document.getElementById("health");
 const useAiCheckbox = document.getElementById("useAi");
 
 function setStatus(text, isError = false) {
@@ -10,98 +14,229 @@ function setStatus(text, isError = false) {
   statusEl.style.color = isError ? "crimson" : "#444";
 }
 
-function renderResult(item, index) {
-  // item may vary depending on your RAG API shape.
-  // Common fields handled: answer, score, source, snippet, metadata
-  const el = document.createElement("div");
-  el.className = "result";
-
-  const meta = document.createElement("div");
-  meta.className = "meta";
-  const title = item.title || item.source || `Result ${index + 1}`;
-  const score = item.score ? ` — score: ${Number(item.score).toFixed(3)}` : "";
-  meta.textContent = title + score;
-  el.appendChild(meta);
-
-  if (item.answer) {
-    const pre = document.createElement("pre");
-    pre.textContent = item.answer;
-    el.appendChild(pre);
-  } else if (item.snippet || item.text) {
-    const pre = document.createElement("pre");
-    pre.textContent = item.snippet || item.text;
-    el.appendChild(pre);
-  } else {
-    el.appendChild(document.createTextNode(JSON.stringify(item, null, 2)));
-  }
-
-  if (item.source || item.url) {
-    const src = document.createElement("div");
-    src.style.marginTop = "8px";
-    src.innerHTML = `<small>Source: ${item.source || item.url}</small>`;
-    el.appendChild(src);
-  }
-
-  return el;
-}
-
-async function doSearch() {
-  const q = qInput.value.trim();
-  if (!q) {
-    setStatus("Enter a query", true);
-    return;
-  }
-
-  setStatus("Searching…");
-  resultsEl.innerHTML = "";
-
-  // adapt path/body to your RAG API; this assumes POST /search -> {query, use_ai}
-  try {
-    const res = await fetch(`${API_BASE}/search`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: q, use_ai: useAiCheckbox.checked }),
+function checkHealth() {
+  fetch(`${API_BASE}/health`)
+    .then((res) => {
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      return res.json();
+    })
+    .then((json) => {
+      healthEl.textContent = JSON.stringify(json);
+    })
+    .catch((err) => {
+      healthEl.textContent = "RAG service is unhealthy: " + err;
+      console.error("Health check error:", err);
     });
-
-    if (!res.ok) {
-      const txt = await res.text();
-      setStatus(`Server error: ${res.status} ${txt}`, true);
-      return;
-    }
-
-    const payload = await res.json();
-
-    // attempt to handle several response shapes
-    // 1) { answer, sources: [...] }
-    // 2) { results: [...] }
-    // 3) array [...]
-    let items = [];
-    if (Array.isArray(payload)) items = payload;
-    else if (payload.results) items = payload.results;
-    else if (payload.sources) {
-      // wrap AI answer first
-      if (payload.answer)
-        items.push({ title: "AI answer", answer: payload.answer });
-      items = items.concat(payload.sources);
-    } else {
-      // fallback: show whole object
-      items = [payload];
-    }
-
-    if (items.length === 0) setStatus("No results found.");
-    else setStatus(`Got ${items.length} result(s)`);
-
-    for (let i = 0; i < items.length; i++) {
-      resultsEl.appendChild(renderResult(items[i], i));
-    }
-  } catch (err) {
-    setStatus("Network error: " + err.message, true);
-  }
 }
+
+healthBtn.addEventListener("click", checkHealth);
 
 searchBtn.addEventListener("click", doSearch);
 qInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") doSearch();
+});
+
+// --- Upload Job Listings Section ---
+const uploadTypeRadios = document.getElementsByName("uploadType");
+const uploadJsonDiv = document.getElementById("upload-json");
+const uploadFormDiv = document.getElementById("upload-form");
+const uploadCsvDiv = document.getElementById("upload-csv");
+const jsonInput = document.getElementById("jsonInput");
+const validateJsonBtn = document.getElementById("validateJsonBtn");
+const submitJsonBtn = document.getElementById("submitJsonBtn");
+const jsonValidationStatus = document.getElementById("jsonValidationStatus");
+const jobForm = document.getElementById("jobForm");
+const formFieldsDiv = document.getElementById("formFields");
+const addFormEntryBtn = document.getElementById("addFormEntryBtn");
+const formStatus = document.getElementById("formStatus");
+const csvFileInput = document.getElementById("csvFileInput");
+const submitCsvBtn = document.getElementById("submitCsvBtn");
+const csvStatus = document.getElementById("csvStatus");
+
+const schemaFields = [
+  "Title",
+  "Employment Type",
+  "Employer",
+  "Expires",
+  "Job Salary",
+  "Salary Type",
+  "Job Location",
+  "Location Type",
+  "Residential Address",
+  "Job Roles",
+];
+
+// Switch upload type UI
+function switchUploadType(type) {
+  uploadJsonDiv.style.display = type === "json" ? "block" : "none";
+  uploadFormDiv.style.display = type === "form" ? "block" : "none";
+  uploadCsvDiv.style.display = type === "csv" ? "block" : "none";
+}
+uploadTypeRadios.forEach((radio) => {
+  radio.addEventListener("change", (e) => {
+    switchUploadType(e.target.value);
+  });
+});
+
+// --- JSON Upload ---
+let validJsonObjects = [];
+function validateJsonInput() {
+  let arr;
+  try {
+    arr = JSON.parse(jsonInput.value);
+    if (!Array.isArray(arr)) throw new Error("Not an array");
+  } catch (e) {
+    jsonValidationStatus.textContent = "Invalid JSON: " + e.message;
+    jsonValidationStatus.style.color = "crimson";
+    validJsonObjects = [];
+    return;
+  }
+  // Validate each object
+  validJsonObjects = arr.filter((obj) => {
+    if (typeof obj !== "object" || obj === null) return false;
+    for (const field of schemaFields) {
+      if (!(field in obj)) return false;
+    }
+    return true;
+  });
+  const invalidCount = arr.length - validJsonObjects.length;
+  jsonValidationStatus.textContent = `Valid objects: ${validJsonObjects.length}. Invalid: ${invalidCount}.`;
+  jsonValidationStatus.style.color = invalidCount === 0 ? "green" : "#b8860b";
+}
+validateJsonBtn.addEventListener("click", validateJsonInput);
+
+submitJsonBtn.addEventListener("click", async () => {
+  if (!validJsonObjects.length) {
+    jsonValidationStatus.textContent = "No valid objects to submit.";
+    jsonValidationStatus.style.color = "crimson";
+    return;
+  }
+  jsonValidationStatus.textContent = "Uploading...";
+  try {
+    const res = await fetch(`${INGEST_BASE}/add-json`, {
+      method: "POST",
+      body: new Blob([JSON.stringify(validJsonObjects)], {
+        type: "application/json",
+      }),
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      jsonValidationStatus.textContent = `Upload failed: ${res.status} ${txt}`;
+      jsonValidationStatus.style.color = "crimson";
+      return;
+    }
+    jsonValidationStatus.textContent = "Upload successful!";
+    jsonValidationStatus.style.color = "green";
+  } catch (e) {
+    jsonValidationStatus.textContent = "Network error: " + e.message;
+    jsonValidationStatus.style.color = "crimson";
+  }
+});
+
+// --- Form Upload ---
+let formEntries = [];
+function renderFormFields() {
+  formFieldsDiv.innerHTML = "";
+  formEntries.forEach((entry, idx) => {
+    const entryDiv = document.createElement("div");
+    entryDiv.style.border = "1px solid #eee";
+    entryDiv.style.padding = "8px";
+    entryDiv.style.marginBottom = "8px";
+    entryDiv.innerHTML = `<b>Entry ${
+      idx + 1
+    }</b> <button type='button' data-remove='${idx}'>Remove</button><br>`;
+    schemaFields.forEach((field) => {
+      const val = entry[field] || "";
+      entryDiv.innerHTML += `<label>${field}: <input type='text' data-field='${field}' data-idx='${idx}' value="${val}" /></label><br>`;
+    });
+    formFieldsDiv.appendChild(entryDiv);
+  });
+  // Add remove handlers
+  formFieldsDiv.querySelectorAll("button[data-remove]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      const idx = Number(btn.getAttribute("data-remove"));
+      formEntries.splice(idx, 1);
+      renderFormFields();
+    });
+  });
+  // Add input handlers
+  formFieldsDiv.querySelectorAll("input[type='text']").forEach((input) => {
+    input.addEventListener("input", (e) => {
+      const idx = Number(input.getAttribute("data-idx"));
+      const field = input.getAttribute("data-field");
+      formEntries[idx][field] = input.value;
+    });
+  });
+}
+addFormEntryBtn.addEventListener("click", (e) => {
+  formEntries.push(Object.fromEntries(schemaFields.map((f) => [f, ""])));
+  renderFormFields();
+});
+jobForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  // Validate all entries
+  const valid = formEntries.filter((entry) =>
+    schemaFields.every((f) => entry[f] && entry[f].trim() !== "")
+  );
+  if (!valid.length) {
+    formStatus.textContent = "No valid entries to submit.";
+    formStatus.style.color = "crimson";
+    return;
+  }
+  formStatus.textContent = "Uploading...";
+  try {
+    const res = await fetch(`${INGEST_BASE}/add-json`, {
+      method: "POST",
+      body: new Blob([JSON.stringify(valid)], { type: "application/json" }),
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      formStatus.textContent = `Upload failed: ${res.status} ${txt}`;
+      formStatus.style.color = "crimson";
+      return;
+    }
+    formStatus.textContent = "Upload successful!";
+    formStatus.style.color = "green";
+    formEntries = [];
+    renderFormFields();
+  } catch (e) {
+    formStatus.textContent = "Network error: " + e.message;
+    formStatus.style.color = "crimson";
+  }
+});
+// Initialize with one entry
+formEntries = [Object.fromEntries(schemaFields.map((f) => [f, ""]))];
+renderFormFields();
+
+// --- CSV Upload ---
+submitCsvBtn.addEventListener("click", async () => {
+  const file = csvFileInput.files[0];
+  if (!file) {
+    csvStatus.textContent = "Please select a CSV file.";
+    csvStatus.style.color = "crimson";
+    return;
+  }
+  csvStatus.textContent = "Uploading...";
+  const formData = new FormData();
+  formData.append("file", file);
+  try {
+    const res = await fetch(`${INGEST_BASE}/add-csv`, {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const txt = await res.text();
+      csvStatus.textContent = `Upload failed: ${res.status} ${txt}`;
+      csvStatus.style.color = "crimson";
+      return;
+    }
+    csvStatus.textContent = "Upload successful!";
+    csvStatus.style.color = "green";
+    csvFileInput.value = "";
+  } catch (e) {
+    csvStatus.textContent = "Network error: " + e.message;
+    csvStatus.style.color = "crimson";
+  }
 });
 
 function setStatus(text, isError = false) {
@@ -109,43 +244,11 @@ function setStatus(text, isError = false) {
   statusEl.style.color = isError ? "crimson" : "#444";
 }
 
-function renderResult(item, index) {
-  // item may vary depending on your RAG API shape.
-  // Common fields handled: answer, score, source, snippet, metadata
-  const el = document.createElement("div");
-  el.className = "result";
-
-  const meta = document.createElement("div");
-  meta.className = "meta";
-  const title = item.title || item.source || `Result ${index + 1}`;
-  const score = item.score ? ` — score: ${Number(item.score).toFixed(3)}` : "";
-  meta.textContent = title + score;
-  el.appendChild(meta);
-
-  if (item.answer) {
-    const pre = document.createElement("pre");
-    pre.textContent = item.answer;
-    el.appendChild(pre);
-  } else if (item.snippet || item.text) {
-    const pre = document.createElement("pre");
-    pre.textContent = item.snippet || item.text;
-    el.appendChild(pre);
-  } else {
-    el.appendChild(document.createTextNode(JSON.stringify(item, null, 2)));
-  }
-
-  if (item.source || item.url) {
-    const src = document.createElement("div");
-    src.style.marginTop = "8px";
-    src.innerHTML = `<small>Source: ${item.source || item.url}</small>`;
-    el.appendChild(src);
-  }
-
-  return el;
-}
-
 async function doSearch() {
+  console.log("doing search");
   const q = qInput.value.trim();
+  const n_results = parseInt(nResultsInput.value);
+  console.log("n results:", n_results);
   if (!q) {
     setStatus("Enter a query", true);
     return;
@@ -159,7 +262,11 @@ async function doSearch() {
     const res = await fetch(`${API_BASE}/search`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: q, use_ai: useAiCheckbox.checked }),
+      body: JSON.stringify({
+        query: q,
+        use_ai: useAiCheckbox.checked,
+        n_results,
+      }),
     });
 
     if (!res.ok) {
@@ -169,32 +276,38 @@ async function doSearch() {
     }
 
     const payload = await res.json();
+    const data = payload[0];
+    const resCode = payload[1];
 
-    // attempt to handle several response shapes
-    // 1) { answer, sources: [...] }
-    // 2) { results: [...] }
-    // 3) array [...]
-    let items = [];
-    if (Array.isArray(payload)) items = payload;
-    else if (payload.results) items = payload.results;
-    else if (payload.sources) {
-      // wrap AI answer first
-      if (payload.answer)
-        items.push({ title: "AI answer", answer: payload.answer });
-      items = items.concat(payload.sources);
-    } else {
-      // fallback: show whole object
-      items = [payload];
-    }
-
-    if (items.length === 0) setStatus("No results found.");
-    else setStatus(`Got ${items.length} result(s)`);
-
-    for (let i = 0; i < items.length; i++) {
-      resultsEl.appendChild(renderResult(items[i], i));
+    if (!data.results.documents[0][1]) setStatus("No results found.");
+    else {
+      setStatus(`Got ${data.results.documents[0].length} result(s)`);
+      displayResults(data.results, data.results.documents[0].length);
     }
   } catch (err) {
     setStatus("Network error: " + err.message, true);
+  }
+}
+
+function displayResults(results, length) {
+  console.log("Display results data:", results);
+
+  for (let i = 0; i < length; i++) {
+    const distance = results.distances[0][i];
+    const text = results.documents[0][i];
+    const id = results.ids[0][i];
+
+    const resultDiv = document.createElement("div");
+    resultDiv.className = "result-item";
+    resultDiv.style.border = "1px solid #ddd";
+    resultDiv.style.margin = "8px 0";
+    resultDiv.style.padding = "8px";
+    resultDiv.innerHTML = `
+    <div><pre style="white-space:pre-wrap;">${text}</pre></div>
+      <div>ID: ${id}</div>
+      <div>Distance: ${distance}</div>
+    `;
+    resultsEl.appendChild(resultDiv);
   }
 }
 
