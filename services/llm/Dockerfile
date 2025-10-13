@@ -1,7 +1,10 @@
-FROM ghcr.io/huggingface/text-generation-inference:latest
-
-ENV MODEL_ID=mistralai/mistral-7b-instruct
-
-EXPOSE 5111
-
-CMD ["--model-id", "mistralai/mistral-7b-instruct", "--port", "5111"]
+FROM python:3.9
+RUN useradd -m -u 1000 user
+WORKDIR /code
+COPY ./requirements.txt /code/requirements.txt
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+USER user
+COPY --link --chown=1000 ./ /code
+EXPOSE 7860
+CMD ["python", "app.py"]
