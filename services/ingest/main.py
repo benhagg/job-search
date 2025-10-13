@@ -9,7 +9,7 @@ from helpers import embed_texts, clean_data, upload_to_chroma
 import debugpy
 debugpy.listen(("0.0.0.0", 5679))  # Use a unique port per service if debugging all at once
 print("Waiting for debugger attach...")
-debugpy.wait_for_client()  # Optional: pause until debugger attaches
+# debugpy.wait_for_client()  # Optional: pause until debugger attaches
 
 app = fastapi.FastAPI()
 app.add_middleware(
@@ -25,23 +25,22 @@ def health():
     return {"status": "Ingest service is healthy"}, 200
 
 
-@app.post("/add-csv")
-def add_csv(file: fastapi.UploadFile):
+@app.post("/add-excel")
+def add_excel(file: fastapi.UploadFile):
+    
     try:
-        df = pd.read_csv(file.file)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to read CSV file: {str(e)}")
-    try:
-        df = clean_data(df)
+        df = clean_data(file)
         texts = df.apply(
-            lambda row: f"{row['Title']}. {row['Employment Type']}. {row['Employer']}. {row['Job Salary']}. {row['Salary Type']}. {row['Job Location']}. {row['Location Type']}. {row['Job Roles']}",
+            lambda row: f'{row["Title"]} {row["Employment Type"]}',
             axis=1
         )
         embeddings = embed_texts(texts.tolist())
-        upload_to_chroma(embeddings, texts)
+        # Prepare metadata for each row
+        metadata = df[["Title", "Employment Type", "Employer", "Job Salary", "Salary Type", "Job Location", "Location Type", "Job Roles", "URL"]].to_dict(orient="records")
+        upload_to_chroma(embeddings, texts.tolist(), metadata)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing CSV data: {str(e)}")
-    return {"status": "CSV file data added successfully"}, 201
+        raise HTTPException(status_code=500, detail=f"Error processing Excel data: {str(e)}")
+    return {"status": "Excel file data added successfully"}, 201
 
 @app.post("/add-json")
 async def add_json(request: fastapi.Request):
@@ -56,7 +55,9 @@ async def add_json(request: fastapi.Request):
             for item in data
         ]
         embeddings = embed_texts(texts)
-        upload_to_chroma(embeddings, texts)
+        # Use the original data as metadata
+        metadata = [{"source": "json_upload", **item} for item in data]
+        upload_to_chroma(embeddings, texts, metadata)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing JSON data: {str(e)}")
     return {"status": "JSON data added successfully"}, 201

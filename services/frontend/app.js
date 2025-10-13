@@ -14,23 +14,6 @@ function setStatus(text, isError = false) {
   statusEl.style.color = isError ? "crimson" : "#444";
 }
 
-function checkHealth() {
-  fetch(`${API_BASE}/health`)
-    .then((res) => {
-      if (!res.ok) throw new Error(`Status ${res.status}`);
-      return res.json();
-    })
-    .then((json) => {
-      healthEl.textContent = JSON.stringify(json);
-    })
-    .catch((err) => {
-      healthEl.textContent = "RAG service is unhealthy: " + err;
-      console.error("Health check error:", err);
-    });
-}
-
-healthBtn.addEventListener("click", checkHealth);
-
 searchBtn.addEventListener("click", doSearch);
 qInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") doSearch();
@@ -40,7 +23,7 @@ qInput.addEventListener("keydown", (e) => {
 const uploadTypeRadios = document.getElementsByName("uploadType");
 const uploadJsonDiv = document.getElementById("upload-json");
 const uploadFormDiv = document.getElementById("upload-form");
-const uploadCsvDiv = document.getElementById("upload-csv");
+const uploadExcelDiv = document.getElementById("upload-excel");
 const jsonInput = document.getElementById("jsonInput");
 const validateJsonBtn = document.getElementById("validateJsonBtn");
 const submitJsonBtn = document.getElementById("submitJsonBtn");
@@ -49,9 +32,9 @@ const jobForm = document.getElementById("jobForm");
 const formFieldsDiv = document.getElementById("formFields");
 const addFormEntryBtn = document.getElementById("addFormEntryBtn");
 const formStatus = document.getElementById("formStatus");
-const csvFileInput = document.getElementById("csvFileInput");
-const submitCsvBtn = document.getElementById("submitCsvBtn");
-const csvStatus = document.getElementById("csvStatus");
+const excelFileInput = document.getElementById("excelFileInput");
+const submitExcelBtn = document.getElementById("submitExcelBtn");
+const excelStatus = document.getElementById("excelStatus");
 
 const schemaFields = [
   "Title",
@@ -70,7 +53,7 @@ const schemaFields = [
 function switchUploadType(type) {
   uploadJsonDiv.style.display = type === "json" ? "block" : "none";
   uploadFormDiv.style.display = type === "form" ? "block" : "none";
-  uploadCsvDiv.style.display = type === "csv" ? "block" : "none";
+  uploadExcelDiv.style.display = type === "excel" ? "block" : "none";
 }
 uploadTypeRadios.forEach((radio) => {
   radio.addEventListener("change", (e) => {
@@ -208,34 +191,34 @@ jobForm.addEventListener("submit", async (e) => {
 formEntries = [Object.fromEntries(schemaFields.map((f) => [f, ""]))];
 renderFormFields();
 
-// --- CSV Upload ---
-submitCsvBtn.addEventListener("click", async () => {
-  const file = csvFileInput.files[0];
+// --- Excel Upload ---
+submitExcelBtn.addEventListener("click", async () => {
+  const file = excelFileInput.files[0];
   if (!file) {
-    csvStatus.textContent = "Please select a CSV file.";
-    csvStatus.style.color = "crimson";
+    excelStatus.textContent = "Please select an Excel file.";
+    excelStatus.style.color = "crimson";
     return;
   }
-  csvStatus.textContent = "Uploading...";
+  excelStatus.textContent = "Uploading...";
   const formData = new FormData();
   formData.append("file", file);
   try {
-    const res = await fetch(`${INGEST_BASE}/add-csv`, {
+    const res = await fetch(`${INGEST_BASE}/add-excel`, {
       method: "POST",
       body: formData,
     });
     if (!res.ok) {
       const txt = await res.text();
-      csvStatus.textContent = `Upload failed: ${res.status} ${txt}`;
-      csvStatus.style.color = "crimson";
+      excelStatus.textContent = `Upload failed: ${res.status} ${txt}`;
+      excelStatus.style.color = "crimson";
       return;
     }
-    csvStatus.textContent = "Upload successful!";
-    csvStatus.style.color = "green";
-    csvFileInput.value = "";
+    excelStatus.textContent = "Upload successful!";
+    excelStatus.style.color = "green";
+    excelFileInput.value = "";
   } catch (e) {
-    csvStatus.textContent = "Network error: " + e.message;
-    csvStatus.style.color = "crimson";
+    excelStatus.textContent = "Network error: " + e.message;
+    excelStatus.style.color = "crimson";
   }
 });
 
@@ -295,17 +278,40 @@ function displayResults(results, length) {
   for (let i = 0; i < length; i++) {
     const distance = results.distances[0][i];
     const text = results.documents[0][i];
-    const id = results.ids[0][i];
+    const metadata = results.metadatas[0][i];
+    const location = metadata["Job Location"] || "";
+    const url = metadata["URL"] || "";
+    const employer = metadata["Employer"] || "";
+    const salary = metadata["Job Salary"] || "";
+    const title = metadata["Title"] || "";
+    const employmentType = metadata["Employment Type"] || "";
+    const jobRoles = metadata["Job Roles"] || "";
 
     const resultDiv = document.createElement("div");
     resultDiv.className = "result-item";
     resultDiv.style.border = "1px solid #ddd";
-    resultDiv.style.margin = "8px 0";
-    resultDiv.style.padding = "8px";
+    resultDiv.style.margin = "12px 0";
+    resultDiv.style.padding = "16px";
+    resultDiv.style.borderRadius = "8px";
+    resultDiv.style.background = "#fafbfc";
+
     resultDiv.innerHTML = `
-    <div><pre style="white-space:pre-wrap;">${text}</pre></div>
-      <div>ID: ${id}</div>
-      <div>Distance: ${distance}</div>
+      <div style="font-size:1.2em;font-weight:bold;margin-bottom:4px;">${title}</div>
+      <div style="margin-bottom:8px;color:#555;">${employmentType} at ${employer}</div>
+      <div style="margin-bottom:8px;"><pre style="white-space:pre-wrap;margin:0;">${text}</pre></div>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:8px;">
+      <div><strong>Location:</strong> ${location}</div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:16px;margin-bottom:8px;">
+      <div><strong>Salary:</strong> ${salary}</div>
+      <div><strong>Distance:</strong> ${distance}</div>
+      </div>
+      <div style="margin-bottom:8px;"><strong>Job Roles:</strong> ${jobRoles}</div>
+      ${
+        url
+          ? `<div><a href="${url}" target="_blank" rel="noopener" style="color:#1976d2;">View Job Posting</a></div>`
+          : ""
+      }
     `;
     resultsEl.appendChild(resultDiv);
   }

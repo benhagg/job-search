@@ -60,7 +60,6 @@
           placeholder="Search for job listings, e.g. 'remote backend engineer'"
         />
         <button id="searchBtn">Search</button>
-        <button id="healthBtn" onClick="checkHealth()">Check RAG Health</button>
       </div>
       <div style="margin-top: 8px">
         <label
@@ -101,7 +100,7 @@
           ><input type="radio" name="uploadType" value="form" /> Form</label
         >
         <label style="margin-left: 16px"
-          ><input type="radio" name="uploadType" value="csv" /> CSV</label
+          ><input type="radio" name="uploadType" value="excel" /> Excel</label
         >
       </div>
       <div id="upload-json" style="display: block">
@@ -126,10 +125,10 @@
         </form>
         <div id="formStatus" style="margin-top: 8px; color: #444"></div>
       </div>
-      <div id="upload-csv" style="display: none">
-        <input type="file" id="csvFileInput" accept=".csv" />
-        <button id="submitCsvBtn">Upload CSV</button>
-        <div id="csvStatus" style="margin-top: 8px; color: #444"></div>
+      <div id="upload-excel" style="display: none">
+        <input type="file" id="excelFileInput" accept=".xlsx" />
+        <button id="submitExcelBtn">Upload Excel</button>
+        <div id="excelStatus" style="margin-top: 8px; color: #444"></div>
       </div>
     </section>
 
