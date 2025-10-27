@@ -24,14 +24,20 @@ services:
       - chroma
     environment:
       - EMBEDDING_URL=http://embed:8003/embed
+      - LLM_URL=http://llm:7860
   llm:
     build:
       context: ./services/llm
       dockerfile: Dockerfile
     ports:
       - "7860:7860"
+      # debugpy port
+      - "5681:5681"
     environment:
       - HF_TOKEN=${HUGGINGFACEHUB_API_KEY}
+      - MODEL_NAME=distilgpt2
+    env_file:
+      - .env
 
   chroma:
     image: chromadb/chroma

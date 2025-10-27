@@ -30,3 +30,6 @@ pip-wheel-metadata/
 # data
 data/
 db-data/
+
+*.xlsx
+*.csv

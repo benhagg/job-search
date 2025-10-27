@@ -1,7 +1,8 @@
-gradio==3.37.0
-protobuf==3.20.3
-scipy==1.11.1
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+transformers==4.31.0
 torch==2.0.1
 sentencepiece==0.1.99
-transformers==4.31.0
-ctransformers==0.2.27
+accelerate==0.21.0
+debugpy==1.8.0
+numpy<2

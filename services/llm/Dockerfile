@@ -7,4 +7,4 @@ RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 USER user
 COPY --link --chown=1000 ./ /code
 EXPOSE 7860
-CMD ["python", "app.py"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]

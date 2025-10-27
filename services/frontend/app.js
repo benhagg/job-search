@@ -260,19 +260,22 @@ async function doSearch() {
 
     const payload = await res.json();
     const data = payload[0];
-    const resCode = payload[1];
 
     if (!data.results.documents[0][1]) setStatus("No results found.");
     else {
       setStatus(`Got ${data.results.documents[0].length} result(s)`);
-      displayResults(data.results, data.results.documents[0].length);
+      displayResults(
+        data.results,
+        data.results.documents[0].length,
+        data.ai_response
+      );
     }
   } catch (err) {
     setStatus("Network error: " + err.message, true);
   }
 }
 
-function displayResults(results, length) {
+function displayResults(results, length, llmResponse) {
   console.log("Display results data:", results);
 
   for (let i = 0; i < length; i++) {
@@ -315,9 +318,65 @@ function displayResults(results, length) {
     `;
     resultsEl.appendChild(resultDiv);
   }
+  if (llmResponse) {
+    const llmDiv = document.createElement("div");
+    llmDiv.style.border = "2px solid #4caf50";
+    llmDiv.style.margin = "12px 0";
+    llmDiv.style.padding = "16px";
+    llmDiv.style.borderRadius = "8px";
+    llmDiv.style.background = "#e8f5e9";
+    llmDiv.innerHTML = `
+      <div style="font-size:1.2em;font-weight:bold;margin-bottom:8px;color:#2e7d32;">AI Summary / Ranking</div>
+      <div><pre style="white-space:pre-wrap;margin:0;">${llmResponse}</pre></div>
+    `;
+    resultsEl.appendChild(llmDiv);
+  }
 }
 
 searchBtn.addEventListener("click", doSearch);
 qInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") doSearch();
 });
+
+// LLM Chat Section -----------------------------------
+const promptInput = document.getElementById("prompt-input");
+const submitPromptBtn = document.getElementById("submit-prompt");
+const llmResponseEl = document.getElementById("llm-response");
+let socket = null;
+const LLM_SOCKET_URL = "ws://localhost:7860/generate-stream";
+
+submitPromptBtn.addEventListener("click", async () => {
+  const prompt = promptInput.value.trim();
+  if (!prompt) {
+    alert("Please enter a prompt.");
+    return;
+  }
+
+  // Initialize WebSocket connection
+  socket = new WebSocket(LLM_SOCKET_URL);
+
+  socket.onopen = () => {
+    socket.send(JSON.stringify({ prompt }));
+    const br = document.createElement("br");
+    llmResponseEl.appendChild(br);
+  };
+
+  socket.onmessage = (event) => {
+    const response = JSON.parse(event.data);
+    if (response.type === "token") {
+      appendTokenToResponse(response.token);
+    } else if (response.type === "complete") {
+      console.log("Received response:", response);
+    } else if (response.type === "error") {
+      console.error("Error from LLM:", response.data);
+    }
+  };
+
+  socket.onclose = () => {
+    console.log("WebSocket connection closed");
+  };
+});
+
+function appendTokenToResponse(token) {
+  llmResponseEl.innerHTML += token;
+}
