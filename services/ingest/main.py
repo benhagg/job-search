@@ -2,7 +2,7 @@ import fastapi
 from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
-from helpers import embed_texts, clean_data, upload_to_chroma
+from helpers import embed_texts, clean_data, clean_csv_data, upload_to_chroma, embedColumns, metadataColumns
 
 
 # For debugging
@@ -25,18 +25,22 @@ def health():
     return {"status": "Ingest service is healthy"}, 200
 
 
-@app.post("/add-excel")
+@app.post("/add-file")
 def add_excel(file: fastapi.UploadFile):
     
     try:
-        df = clean_data(file)
+        filename = getattr(file, "filename", "") or ""
+        if filename.lower().endswith(".csv"):
+            df = clean_csv_data(file)
+        else:
+            df = clean_data(file)
         texts = df.apply(
-            lambda row: f'{row["Title"]} {row["Employment Type"]}',
+            lambda row: " ".join(str(row[col]) for col in embedColumns),
             axis=1
         )
         embeddings = embed_texts(texts.tolist())
         # Prepare metadata for each row
-        metadata = df[["Title", "Employment Type", "Employer", "Job Salary", "Salary Type", "Job Location", "Location Type", "Job Roles", "URL"]].to_dict(orient="records")
+        metadata = df[metadataColumns].to_dict(orient="records")
         upload_to_chroma(embeddings, texts.tolist(), metadata)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing Excel data: {str(e)}")
@@ -44,14 +48,13 @@ def add_excel(file: fastapi.UploadFile):
 
 @app.post("/add-json")
 async def add_json(request: fastapi.Request):
-    import json
     try:
         data = await request.json()
         if not isinstance(data, list):
             raise HTTPException(status_code=400, detail="Expected a list of job listings")
         # Process data
         texts = [
-            f"{item['Title']}. {item['Employment Type']}. {item['Employer']}. {item['Job Salary']}. {item['Salary Type']}. {item['Job Location']}. {item['Location Type']}. {item['Job Roles']}"
+            " ".join(str(item[col]) for col in embedColumns)
             for item in data
         ]
         embeddings = embed_texts(texts)

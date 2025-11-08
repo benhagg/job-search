@@ -203,7 +203,7 @@ submitExcelBtn.addEventListener("click", async () => {
   const formData = new FormData();
   formData.append("file", file);
   try {
-    const res = await fetch(`${INGEST_BASE}/add-excel`, {
+    const res = await fetch(`${INGEST_BASE}/add-file`, {
       method: "POST",
       body: formData,
     });
